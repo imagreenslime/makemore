@@ -1,21 +1,21 @@
 import random
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt # for making figures
+import matplotlib.pyplot as plt
 
 
 # -------------------------------------------------------------------------------------
-# helper functions for initializing and training the neural network (note that most of these functions are defaults for the torch library, remade for good practice)
+# helper functions for initializing and training the neural network (these functions are basics in torch library, remade for practice)
 
 # initializing the weights and biases
 class Linear:
     def __init__(self, fan_in, fan_out, bias=True):
-        # initialize the weights and biases of the neural network
+        # initialize the weights and biases of the embedding vectors/nuerons
         self.weight = torch.randn((fan_in, fan_out)) / fan_in**0.5
         self.bias = torch.zeros(fan_out) if bias else None
         
     def __call__(self,x):
-        # hidden pre layer activation / forward pass
+        # hidden pre layer activation / first forward pass
         self.out = x @ self.weight
         if self.bias is not None:
             self.out += self.bias
@@ -27,12 +27,12 @@ class Linear:
 # batch normalization: regularizes the gradient descent and improves training speed 
 class BatchNorm1d:
     def __init__(self,dim,eps=1e-5, momentum=0.1):
-        self.eps = eps # numerical stability
+        self.eps = eps # only for numerical stability
         self.momentum = momentum # exponential moving average
         self.training = True # a non training set indicates the buffers have already been calculated
-        # parameters (back propogation)
-        self.gamma = torch.ones(dim) # weights 2
-        self.beta = torch.zeros(dim) # biases 2
+        # parameters
+        self.gamma = torch.ones(dim) # new weights
+        self.beta = torch.zeros(dim) # new biases
         # buffers (running 'momentum update')
         self.running_mean = torch.zeros(dim)
         self.running_var = torch.ones(dim)
@@ -40,11 +40,11 @@ class BatchNorm1d:
     def __call__(self, x):
         # forward pass
         if self.training:
+            # to calculate an accurate mean and variance of the batch a 2d shape is needed
             if x.ndim == 2:
                 dim = 0
             elif x.ndim == 3:
                 dim = (0,1)
-
             xmean = x.mean(dim, keepdim=True) # mini batch mean 
             xvar = x.var(dim, keepdim=True) # mini batch var
         else:
@@ -73,7 +73,7 @@ class Tanh:
 # embed and concat characters into vectors
 class Embedding:
     def __init__(self, num_embeddings, embedding_dim):
-        self.weight = torch.randn((num_embeddings, embedding_dim))
+        self.weight = torch.randn((num_embeddings, embedding_dim)) # a lookup table that stores embeddings
     
     def __call__(self, IX):
         self.out = self.weight[IX]
@@ -97,11 +97,12 @@ class FlattenConsecutive:
     def parameters(self):
         return []
 
-# calling the forward pass
+# creates a chain of neural layers in the order it is passed into it thus making the neural network
 class Sequential:
     def __init__(self, layers):
         self.layers = layers
     
+    # calling forward pass
     def __call__(self, x):
         for layer in self.layers:
             x = layer(x)
@@ -166,6 +167,7 @@ class ChararacterDataset:
         self.itos = {i:s for s,i in self.stoi.items()}
         self.words = words
         
+    # store the context in the first array then the next letter in the second 
     def render_dataset(self):
         X, Y = [], []
         for w in self.words:
@@ -219,8 +221,7 @@ if __name__ == "__main__":
 
     # g = torch.Generator().manual_seed(2147483647)
 
-    # without tanh paddings all the linear layers would collapse into 1 equation
-    # activate the nueron layers
+    # activate the nueron layers; without tanh paddings all the linear layers would collapse into 1 equation
     model = Sequential([
         Embedding(vocab_size, nuerons), 
         FlattenConsecutive(2), Linear(nuerons * 2, hidden, bias=False), BatchNorm1d(hidden), Tanh(),
@@ -234,6 +235,7 @@ if __name__ == "__main__":
 
     parameters = model.parameters()
     print(f"parameter size: {sum(p.nelement() for p in parameters)}")
+    # activates back propagation
     for p in parameters: 
         p.requires_grad = True
 
